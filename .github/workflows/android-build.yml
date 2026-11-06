@@ -70,6 +70,9 @@ jobs:
         working-directory: vendor/assaultcube-android/android
         run: |
           chmod +x build_deps.sh
+          # libogg is installed by build_deps.sh into this ABI-specific prefix.
+          # Export it so libvorbis' FindOgg.cmake can locate the Android headers/library.
+          export CMAKE_PREFIX_PATH="$PWD/app/src/main/jni/prebuilt/arm64-v8a${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
           ./build_deps.sh arm64-v8a
 
       - name: Set up Gradle 8.2
