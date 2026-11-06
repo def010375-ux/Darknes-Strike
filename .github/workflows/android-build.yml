@@ -76,17 +76,9 @@ jobs:
             -e 's/-DOGG_INCLUDE_DIRS=/-DOGG_INCLUDE_DIR=/' \
             -e 's/-DOGG_LIBRARIES=/-DOGG_LIBRARY=/' \
             build_deps.sh
-          # The current OpenAL Soft sources require C++20 concepts.
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path("build_deps.sh")
-          source = path.read_text()
-          old = "    -DLIBTYPE=STATIC\n"
-          new = "    -DLIBTYPE=STATIC \\\n    -DCMAKE_CXX_STANDARD=20 \\\n    -DCMAKE_CXX_FLAGS=-std=c++20\n"
-          if source.count(old) != 1:
-              raise SystemExit("Could not uniquely locate OpenAL CMake options")
-          path.write_text(source.replace(old, new))
-          PY
+          # Pin OpenAL Soft to 1.23.1: this release uses C++14 and is
+          # compatible with the NDK 25 libc++ toolchain used by this port.
+          sed -i 's#git clone --depth 1 https://github.com/kcat/openal-soft.git#git clone --depth 1 --branch 1.23.1 https://github.com/kcat/openal-soft.git#' build_deps.sh
           ./build_deps.sh arm64-v8a
 
       - name: Set up Gradle 8.2
