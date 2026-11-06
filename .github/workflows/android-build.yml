@@ -24,7 +24,7 @@ jobs:
         run: |
           set -euxo pipefail
           apt-get update
-          apt-get install -y --no-install-recommends openjdk-17-jdk unzip wget
+          apt-get install -y --no-install-recommends openjdk-17-jdk unzip wget librsvg2-bin
           mkdir -p "$ANDROID_HOME/cmdline-tools"
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O /tmp/android-commandline-tools.zip
           mkdir -p /tmp/android-commandline-tools
@@ -81,6 +81,9 @@ jobs:
           ls -la "$ANDROID_HOME/build-tools"
           ls -la "$HOME/.local/share/godot/export_templates/4.4.1.stable"
           test -s /tmp/darknes-debug.keystore
+
+      - name: Prepare DSm launcher icon
+        run: rsvg-convert -w 512 -h 512 assets/dsm_icon.svg -o assets/dsm_icon.png
 
       - name: Validate Godot project
         run: godot --headless --editor --path . --quit
