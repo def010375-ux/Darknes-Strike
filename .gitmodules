@@ -1,0 +1,3 @@
+[submodule "vendor/assaultcube-android"]
+	path = vendor/assaultcube-android
+	url = https://github.com/SarahRoseLives/AssaultCubeAndroid.git
