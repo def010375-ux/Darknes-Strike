@@ -1,0 +1,27 @@
+name: Darknes Strike Android build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  validate-and-export:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.4.1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate Godot project
+        run: godot --headless --editor --path . --quit
+      - name: Export Android APK
+        run: |
+          mkdir -p build
+          godot --headless --path . --export-debug "Android" build/DarknesStrike-debug.apk
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Darknes-Strike-Android
+          path: build/DarknesStrike-debug.apk
+          if-no-files-found: error
