@@ -85,6 +85,9 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.2'
+          # The pinned upstream submodule includes an additional wrapper JAR
+          # not used by this workflow (we invoke the installed Gradle binary).
+          validate-wrappers: false
 
       - name: Assemble ARM64 debug APK
         working-directory: vendor/assaultcube-android/android
