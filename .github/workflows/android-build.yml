@@ -28,7 +28,7 @@ jobs:
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/cmdline-tools/bin/sdkmanager"
           test -x "$SDKMANAGER"
           yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses || true
-          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-35" "build-tools;35.0.1" "cmake;3.10.2.4988404" "ndk;28.1.13356709"
           mkdir -p "$HOME/.local/share/godot/export_templates/4.4.1.stable"
           wget -q "https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz" -O /tmp/godot-templates.tpz
           unzip -q /tmp/godot-templates.tpz -d /tmp/godot-templates
