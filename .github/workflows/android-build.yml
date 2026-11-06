@@ -60,6 +60,9 @@ jobs:
           test -d "$AC_DIR/config"
           # The upstream Gradle file contains the author's local Windows-only NDK path.
           sed -i '/^[[:space:]]*ndkPath[[:space:]]/d' "$AC_DIR/android/app/build.gradle"
+          # Build gl4es as a static archive: Android has no libGL.so.1.
+          # This prevents libmain.so from acquiring a desktop OpenGL runtime dependency.
+          sed -i '/set(NO_INIT_CONSTRUCTOR ON CACHE BOOL "" FORCE)/a set(STATICLIB ON CACHE BOOL "" FORCE)' "$AC_DIR/android/app/src/main/jni/CMakeLists.txt"
           mkdir -p "$AC_DIR/android/app/src/main/assets"
           rm -rf "$AC_DIR/android/app/src/main/assets/packages" "$AC_DIR/android/app/src/main/assets/config"
           cp -a "$AC_DIR/packages" "$AC_DIR/android/app/src/main/assets/packages"
