@@ -13,6 +13,7 @@ jobs:
     env:
       GODOT_VERSION: "4.4.1"
       ANDROID_HOME: /usr/lib/android-sdk
+      ANDROID_SDK_ROOT: /usr/lib/android-sdk
       JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
     steps:
       - name: Checkout
@@ -21,42 +22,49 @@ jobs:
       - name: Install Android export prerequisites
         shell: bash
         run: |
+          set -euxo pipefail
           apt-get update
           apt-get install -y --no-install-recommends openjdk-17-jdk unzip wget
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/cmdline-tools/bin/sdkmanager"
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses || true
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
           mkdir -p "$HOME/.local/share/godot/export_templates/4.4.1.stable"
           wget -q "https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz" -O /tmp/godot-templates.tpz
           unzip -q /tmp/godot-templates.tpz -d /tmp/godot-templates
           cp /tmp/godot-templates/templates/android_debug.apk "$HOME/.local/share/godot/export_templates/4.4.1.stable/"
           cp /tmp/godot-templates/templates/android_release.apk "$HOME/.local/share/godot/export_templates/4.4.1.stable/"
           printf '4.4.1.stable' > "$HOME/.local/share/godot/export_templates/4.4.1.stable/version.txt"
-
-          # Godot keeps Android SDK/JDK paths in per-user EditorSettings.
-          # The CI image contains the SDK, but a fresh job still needs these paths configured.
           mkdir -p "$HOME/.config/godot"
           cat > "$HOME/.config/godot/editor_settings-4.4.tres" <<EOF
           [gd_resource type="EditorSettings" format=3]
 
           [resource]
-          export/android/java_sdk_path = "/usr/lib/jvm/java-17-openjdk-amd64"
-          export/android/android_sdk_path = "/usr/lib/android-sdk"
-          export/android/adb = "/usr/bin/adb"
-          export/android/debug_keystore = "/tmp/darknes-debug.keystore"
-          export/android/debug_keystore_user = "androiddebugkey"
-          export/android/debug_keystore_pass = "android"
-          export/android/force_system_user = false
+          export/android/java_sdk_path = "$JAVA_HOME"
+          export/android/android_sdk_path = "$ANDROID_HOME"
           EOF
-
-          test -x "$ANDROID_HOME/platform-tools/adb" || { echo "Android SDK platform-tools/adb not found"; exit 1; }
           keytool -genkeypair -v -keystore /tmp/darknes-debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=/tmp/darknes-debug.keystore" >> "$GITHUB_ENV"
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey" >> "$GITHUB_ENV"
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android" >> "$GITHUB_ENV"
 
+      - name: Diagnose Android toolchain
+        shell: bash
+        run: |
+          set -euxo pipefail
+          java -version
+          "$ANDROID_HOME/platform-tools/adb" version
+          ls -la "$ANDROID_HOME/platforms"
+          ls -la "$ANDROID_HOME/build-tools"
+          ls -la "$HOME/.local/share/godot/export_templates/4.4.1.stable"
+
       - name: Validate Godot project
         run: godot --headless --editor --path . --quit
 
       - name: Export Android APK
+        shell: bash
         run: |
+          set -euxo pipefail
           mkdir -p build
           godot --headless --verbose --path . --export-debug "Android" build/DarknesStrike-debug.apk
           test -s build/DarknesStrike-debug.apk
