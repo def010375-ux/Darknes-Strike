@@ -12,25 +12,40 @@ jobs:
       image: barichello/godot-ci:4.4.1
     env:
       GODOT_VERSION: "4.4.1"
-      ANDROID_HOME: /usr/lib/android-sdk
-      ANDROID_SDK_ROOT: /usr/lib/android-sdk
+      ANDROID_HOME: /opt/android-sdk
+      ANDROID_SDK_ROOT: /opt/android-sdk
       JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Android export prerequisites
+      - name: Install official Android SDK
         shell: bash
         run: |
           set -euxo pipefail
           apt-get update
           apt-get install -y --no-install-recommends openjdk-17-jdk unzip wget
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/cmdline-tools/bin/sdkmanager"
-          test -x "$SDKMANAGER"
-          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses || true
-          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-33" "build-tools;33.0.2" "platforms;android-35" "build-tools;35.0.1" "cmake;3.10.2.4988404" "ndk;28.1.13356709"
-          test -d "$ANDROID_HOME/platforms/android-33"
-          test -x "$ANDROID_HOME/build-tools/33.0.2/aapt"
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O /tmp/android-commandline-tools.zip
+          mkdir -p /tmp/android-commandline-tools
+          unzip -q /tmp/android-commandline-tools.zip -d /tmp/android-commandline-tools
+          mv /tmp/android-commandline-tools/cmdline-tools "$ANDROID_HOME/cmdline-tools/latest"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          chmod +x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" \
+            "platform-tools" \
+            "platforms;android-34" \
+            "platforms;android-35" \
+            "build-tools;34.0.0" \
+            "build-tools;35.0.0" \
+            "cmake;3.10.2.4988404" \
+            "ndk;23.2.8568313"
+          test -x "$ANDROID_HOME/platform-tools/adb"
+          test -f "$ANDROID_HOME/platforms/android-34/android.jar"
+          test -f "$ANDROID_HOME/platforms/android-35/android.jar"
+          test -x "$ANDROID_HOME/build-tools/34.0.0/apksigner"
+          test -x "$ANDROID_HOME/build-tools/35.0.0/apksigner"
           mkdir -p "$HOME/.local/share/godot/export_templates/4.4.1.stable"
           wget -q "https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz" -O /tmp/godot-templates.tpz
           unzip -q /tmp/godot-templates.tpz -d /tmp/godot-templates
@@ -38,17 +53,22 @@ jobs:
           cp /tmp/godot-templates/templates/android_release.apk "$HOME/.local/share/godot/export_templates/4.4.1.stable/"
           printf '4.4.1.stable' > "$HOME/.local/share/godot/export_templates/4.4.1.stable/version.txt"
           mkdir -p "$HOME/.config/godot"
+          keytool -genkeypair -v -keystore /tmp/darknes-debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           cat > "$HOME/.config/godot/editor_settings-4.4.tres" <<EOF
           [gd_resource type="EditorSettings" format=3]
 
           [resource]
           export/android/java_sdk_path = "$JAVA_HOME"
           export/android/android_sdk_path = "$ANDROID_HOME"
+          export/android/debug_keystore = "/tmp/darknes-debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
           EOF
-          keytool -genkeypair -v -keystore /tmp/darknes-debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=/tmp/darknes-debug.keystore" >> "$GITHUB_ENV"
-          echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey" >> "$GITHUB_ENV"
-          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android" >> "$GITHUB_ENV"
+          {
+            echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=/tmp/darknes-debug.keystore"
+            echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey"
+            echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android"
+          } >> "$GITHUB_ENV"
 
       - name: Diagnose Android toolchain
         shell: bash
@@ -56,10 +76,11 @@ jobs:
           set -euxo pipefail
           java -version
           "$ANDROID_HOME/platform-tools/adb" version
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --list_installed
           ls -la "$ANDROID_HOME/platforms"
-          ls -la "$ANDROID_HOME/platforms/android-33"
           ls -la "$ANDROID_HOME/build-tools"
           ls -la "$HOME/.local/share/godot/export_templates/4.4.1.stable"
+          test -s /tmp/darknes-debug.keystore
 
       - name: Validate Godot project
         run: godot --headless --editor --path . --quit
@@ -71,6 +92,7 @@ jobs:
           mkdir -p build
           godot --headless --verbose --path . --export-debug "Android" build/DarknesStrike-debug.apk
           test -s build/DarknesStrike-debug.apk
+          ls -lh build/DarknesStrike-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
