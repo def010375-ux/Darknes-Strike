@@ -12,6 +12,7 @@ jobs:
       image: barichello/godot-ci:4.4.1
     env:
       GODOT_VERSION: "4.4.1"
+      ANDROID_HOME: /usr/lib/android-sdk
       JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
     steps:
       - name: Checkout
@@ -28,6 +29,24 @@ jobs:
           cp /tmp/godot-templates/templates/android_debug.apk "$HOME/.local/share/godot/export_templates/4.4.1.stable/"
           cp /tmp/godot-templates/templates/android_release.apk "$HOME/.local/share/godot/export_templates/4.4.1.stable/"
           printf '4.4.1.stable' > "$HOME/.local/share/godot/export_templates/4.4.1.stable/version.txt"
+
+          # Godot keeps Android SDK/JDK paths in per-user EditorSettings.
+          # The CI image contains the SDK, but a fresh job still needs these paths configured.
+          mkdir -p "$HOME/.config/godot"
+          cat > "$HOME/.config/godot/editor_settings-4.4.tres" <<EOF
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/java_sdk_path = "/usr/lib/jvm/java-17-openjdk-amd64"
+          export/android/android_sdk_path = "/usr/lib/android-sdk"
+          export/android/adb = "/usr/bin/adb"
+          export/android/debug_keystore = "/tmp/darknes-debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          export/android/force_system_user = false
+          EOF
+
+          test -x "$ANDROID_HOME/platform-tools/adb" || { echo "Android SDK platform-tools/adb not found"; exit 1; }
           keytool -genkeypair -v -keystore /tmp/darknes-debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=/tmp/darknes-debug.keystore" >> "$GITHUB_ENV"
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey" >> "$GITHUB_ENV"
@@ -39,7 +58,7 @@ jobs:
       - name: Export Android APK
         run: |
           mkdir -p build
-          godot --headless --path . --export-debug "Android" build/DarknesStrike-debug.apk
+          godot --headless --verbose --path . --export-debug "Android" build/DarknesStrike-debug.apk
           test -s build/DarknesStrike-debug.apk
 
       - name: Upload APK
